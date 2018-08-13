@@ -1,0 +1,195 @@
+
+
+CREATE FUNCTION dbo.CalculateTripIntoSA_ExactTimes
+(	
+	@SA NVARCHAR(10), 
+	@CATEGORY INT
+)
+RETURNS @CAL_TABLE TABLE (
+						TAIAN INT,
+						ZHONGLI INT,
+						XIHU INT, 
+						XILOU INT, 
+						NANTOU INT,
+						QINGSHUI INT, 
+						HUKO INT, 
+						GUANXI INT,
+						NON INT
+						)
+AS
+BEGIN
+
+
+DECLARE @i VARCHAR(100)
+DECLARE @TAIAN INT,
+		@ZHONGLI INT,
+		@XIHU INT, 
+		@XILOU INT, 
+		@QINGSHUI INT, 
+		@NANTOU INT,
+		@HUKO INT, 
+		@GUANXI INT,
+		@NON INT
+DECLARE @SERVICE_AREA NVARCHAR(10), @CNT INT
+DECLARE @ROW_NUM INT
+-- NEEDED !! SET THE INITAIL VALUE AS 0... 
+SET @TAIAN = 0
+SET @ZHONGLI = 0
+SET @XIHU = 0
+SET @XILOU= 0
+SET @QINGSHUI = 0
+SET @NANTOU = 0 
+SET @HUKO = 0
+SET @GUANXI = 0
+SET @NON = 0
+
+--START CURSOR_1--
+DECLARE cursor_1 CURSOR FOR	(	SELECT BMS_TX_BATCH
+								FROM [athena_dev].[dbo].[all_wOD]
+								WHERE STOP = 'P'
+								AND MVDIS_CATEGORY = @CATEGORY
+								AND SERVICE_AREA = @SA
+								GROUP BY BMS_TX_BATCH
+								
+							)
+OPEN cursor_1
+FETCH NEXT FROM cursor_1 INTO @i
+WHILE @@FETCH_STATUS = 0
+BEGIN
+	-- START FOR CURSOR_2 --
+	DECLARE cursor_2 CURSOR FOR (
+									select SERVICE_AREA, CNT
+									from dbo.OutputTripTable(@i) 
+								)
+	OPEN cursor_2
+	FETCH NEXT FROM cursor_2 INTO @SERVICE_AREA, @CNT
+	WHILE @@FETCH_STATUS = 0
+	BEGIN
+		-- USING VERSION 2 : COUNT FOR THE EXACTLY TIMES THE CAR GONE INTO THESE SERVEICE AREA...
+		-- (VERSION 1 : ONLY COUNT FOR THE TIMES WHICH THE CAR HAVE BEEN TO THESE SERVEICE AREA...)
+		select @ROW_NUM =  COUNT(*) from dbo.OutputTripTable(@i)
+		IF @ROW_NUM = 1 AND @SERVICE_AREA = @SA
+		BEGIN
+			SET @NON = @NON + 1  -- calculate the amount of cars that didn't go into other service area
+			IF @SERVICE_AREA = ''
+			BEGIN
+				SET @TAIAN = @TAIAN + @CNT
+			END
+			ELSE IF @SERVICE_AREA = 'い胏'
+			BEGIN
+				SET @ZHONGLI = @ZHONGLI + @CNT
+			END
+			ELSE IF @SERVICE_AREA = '﹁打'
+			BEGIN
+				SET @XIHU = @XIHU + @CNT
+			END
+			ELSE IF @SERVICE_AREA = '﹁脸'
+			BEGIN
+				SET @XILOU = @XILOU + @CNT
+			END
+			ELSE IF @SERVICE_AREA = '玭щ'
+			BEGIN
+				SET @NANTOU = @NANTOU + @CNT
+			END
+			ELSE IF @SERVICE_AREA = '睲'
+			BEGIN
+				SET @QINGSHUI = @QINGSHUI + @CNT
+			END
+			ELSE IF @SERVICE_AREA = '打'
+			BEGIN
+				SET @HUKO = @HUKO + @CNT
+			END
+			ELSE IF @SERVICE_AREA = '闽﹁'
+			BEGIN
+				SET @GUANXI = @GUANXI + @CNT
+			END
+		END
+		ELSE IF @ROW_NUM > 1
+		BEGIN
+			IF @SERVICE_AREA = ''
+			BEGIN
+				SET @TAIAN = @TAIAN + @CNT
+			END
+			ELSE IF @SERVICE_AREA = 'い胏'
+			BEGIN
+				SET @ZHONGLI = @ZHONGLI + @CNT
+			END
+			ELSE IF @SERVICE_AREA = '﹁打'
+			BEGIN
+				SET @XIHU = @XIHU + @CNT
+			END
+			ELSE IF @SERVICE_AREA = '﹁脸'
+			BEGIN
+				SET @XILOU = @XILOU + @CNT
+			END
+			ELSE IF @SERVICE_AREA = '玭щ'
+			BEGIN
+				SET @NANTOU = @NANTOU + @CNT
+			END
+			ELSE IF @SERVICE_AREA = '睲'
+			BEGIN
+				SET @QINGSHUI = @QINGSHUI + @CNT
+			END
+			ELSE IF @SERVICE_AREA = '打'
+			BEGIN
+				SET @HUKO = @HUKO + @CNT
+			END
+			ELSE IF @SERVICE_AREA = '闽﹁'
+			BEGIN
+				SET @GUANXI = @GUANXI + @CNT
+			END
+		END
+			
+
+		FETCH NEXT FROM cursor_2 INTO @SERVICE_AREA, @CNT
+	END
+	CLOSE cursor_2
+	DEALLOCATE cursor_2
+	-- END CURSOR_2 --
+
+
+
+	FETCH NEXT FROM cursor_1 INTO @i
+END
+CLOSE cursor_1
+DEALLOCATE cursor_1
+-- END CURSOR_1 --
+
+INSERT INTO @CAL_TABLE(TAIAN, ZHONGLI, XIHU, XILOU,	NANTOU, QINGSHUI, HUKO, GUANXI, NON )
+	values( @TAIAN, @ZHONGLI, @XIHU, @XILOU, @NANTOU, @QINGSHUI, @HUKO, @GUANXI, @NON)
+
+
+RETURN
+END
+
+
+
+--===================================================================
+/*
+SELECT BMS_TX_BATCH, SERVICE_AREA, COUNT(*) AS CNT
+	FROM [athena_dev].[dbo].[all_wOD]
+	WHERE STOP = 'P'
+	AND MVDIS_CATEGORY = 31
+	GROUP BY BMS_TX_BATCH, SERVICE_AREA
+
+SELECT BMS_TX_BATCH, COUNT(*) AS CNT
+FROM [athena_dev].[dbo].[all_wOD]
+WHERE STOP = 'P'
+AND MVDIS_CATEGORY = 31
+AND SERVICE_AREA = ''
+GROUP BY BMS_TX_BATCH
+ORDER BY CNT DESC
+
+SELECT SERVICE_AREA, COUNT(*) AS CNT
+FROM [athena_dev].[dbo].[all_wOD]
+WHERE BMS_TX_BATCH = '1805250002312515508'
+AND STOP = 'P'
+GROUP BY SERVICE_AREA
+
+
+*/
+/*
+SELECT *
+FROM dbo.CalculateTripIntoSA_ExactTimes('', 31)
+
+*/
